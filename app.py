@@ -22,8 +22,12 @@ class Edgerouter:
   def login(host, username, password):
       global connection
       connection = pexpect.spawn("ssh " + username + "@" + host, maxread=16384)
-      connection.expect("password:")
-      connection.sendline(password)
+      code = connection.expect(['Are you sure you want to continue connecting (yes/no)?', 'password:'])
+      if code == 0:
+        connection.sendline('yes')
+        code = connection.expect(['Are you sure you want to continue connecting (yes/no)?', 'password:'])
+      if code == 1:
+        connection.sendline(password)
       connection.expect("$")
   # endDef
   
