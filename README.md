@@ -1,5 +1,5 @@
 # Edgerouter Temperatures to InfluxDB
-This container will query your Edgerouter every 30 seconds for the CPU, PNY and Board temperatures and export it to InfluxDB.
+This container will query your Edgerouter every minute for the CPU, PNY and Board temperatures and export it to InfluxDB.
 
 ## Usage
 ```shell
