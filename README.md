@@ -17,4 +17,4 @@ docker run larsstoker/edgerouter-temps2influx:latest
 * `INFLUX_DB` - InfluxDB database
 
 
-![example-grafana](https://i.imgur.com/I6T2CNG.png)
+![example-grafana](https://i.imgur.com/4zAWJSX.png)
