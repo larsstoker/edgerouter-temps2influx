@@ -1,102 +1,94 @@
-#!/usr/bin/env python3
 from influxdb import InfluxDBClient
-from influxdb.exceptions import InfluxDBClientError
 import pexpect
-import logging
-import time
-import schedule
+import json
 from pathlib import Path
 from os import environ
 
-edgerouter_host = environ['EDGEROUTER_HOST']
-edgerouter_usr = environ['EDGEROUTER_USR']
-edgerouter_pwd = environ['EDGEROUTER_PWD']
-influx_host = environ['INFLUX_HOST']
-influx_usr = environ['INFLUX_USR']
-influx_pwd = environ['INFLUX_PWD']
-influx_db = environ['INFLUX_DB']
+#Load enviornment variables
+#Edgerouter vars
+er_host = environ['ER_HOST']
+er_usr = environ['ER_USR']
+er_pwd = environ['ER_PWD']
+#DB vars
+# db_host = environ['DB_HOST']
+# db_database = environ['DB_DATABASE']
+# db_usr = environ['DB_USR']
+# db_pwd = environ['DB_PWD']
 
 class Edgerouter:
-  connection = ""
-  # Login to edgerouter
-  def login(host, username, password):
-      global connection
-      connection = pexpect.spawn("ssh " + username + "@" + host, maxread=16384)
-      code = connection.expect(['Are you sure you want to continue connecting (yes/no)?', 'password:'])
-      if code == 0:
-        connection.sendline('yes')
-        code = connection.expect(['Are you sure you want to continue connecting (yes/no)?', 'password:'])
-      if code == 1:
-        connection.sendline(password)
-      connection.expect("$")
-  # endDef
-  
-  # Get CPU Temp
-  def cpuTemp():
-      connection.sendline("show hardware temperature")
-      connection.expect("CPU:")
-      temp = connection.read(2).decode("utf-8")
+    def __init__(
+                self,
+                host,
+                usr,
+                pwd
+        ):
+        self.host = host
+        self.usr = usr
+        self.pwd = pwd
+        
+        self.session = self.connect()
 
-      print("CPU Temperature is: " + temp + "°C")
-      return temp
-  # endDef
+    #Connect to Edgerouter
+    def connect(self):
+        child = pexpect.spawn('ssh ' + self.usr + '@' + self.host, maxread=16384)
+        code = child.expect(['Are you sure you want to continue connecting (yes/no)?', 'password:'])
+        if code == 0:
+            child.sendline('yes')
+            code = child.expect(['Are you sure you want to continue connecting (yes/no)?', 'password:'])
+        if code == 1:
+            child.sendline(self.pwd)
+        child.expect('$')
+        return child
 
-    # Get PHY Temp
-  def phyTemp():
-      connection.sendline("show hardware temperature")
-      connection.expect("PHY:")
-      temp = connection.read(2).decode("utf-8")
+    #Get CPU Temp
+    def GetCpuTemp(self):
+        self.session.sendline('show hardware temperature')
+        self.session.expect_exact('CPU:')
 
-      print("PHY Temperature is: " + temp + "°C")
-      return temp
-  # endDef
+        return(self.session.read(2).decode('utf-8'))
+    
+    #Get PHY Temp
+    def GetPhyTemp(self):
+        self.session.sendline('show hardware temperature')
+        self.session.expect_exact('PHY:')
 
-  # Get Board Temp
-  def boardTemp():
-      connection.sendline("show hardware temperature")
-      connection.expect_exact("Board (CPU):")
-      temp = connection.read(2).decode("utf-8")
+        return(self.session.read(2).decode('utf-8'))
 
-      print("Board Temperature is: " + temp + "°C")
-      return temp
-  # endDef
+    #Get Board Temp
+    def GetBoardTemp(self):
+        self.session.sendline('show hardware temperature')
+        self.session.expect_exact('Board (CPU):')
 
-# Export to InfluxDB
-def export_influxdb(host,user,password,db):
-  #Influx client 
-  client = InfluxDBClient(
-    host=influx_host,
-    port=8086,
-    username=influx_usr,
-    password=influx_pwd
-  )
+        return(self.session.read(2)).decode('utf-8')
 
-  measurement = {}
-  measurement['measurement'] = 'edgerouter'
-  measurement['tags'] = {}
-  measurement['tags']['hostname'] = str(edgerouter_host)
-  measurement['fields'] = {}
-  measurement['fields']['cpuTemp'] = str(Edgerouter.cpuTemp())
-  measurement['fields']['phyTemp'] = str(Edgerouter.phyTemp())
-  measurement['fields']['BoardTemp'] = str(Edgerouter.boardTemp())
-  try:
-    client.switch_database(db)
-    client.write_points([measurement])
-    print("Exported to InfluxDB successfully")
-    print("")
-  except InfluxDBClientError as e:
-    logging.error("Failed to export data to Influxdb: %s" % e)
-#endDef
+    #Get Edgerouter Hostname
+    def GetHostname(self):
+        self.session.sendline('show host name')
+        self.session.expect("")
+
+        return(self.session.read())
+
+# #Export data to influx
+# def exportInflux(host, db, usr, pwd):
+#     client = InfluxDBClient(host=host, db=db , username=usr, password=pwd, port=8086)
+
+#     client.create_database(db)
+#     measurement = {}
+#     measurement['measurement'] = 'edgerouter'
+#     measurement['tags'] = {}
+#     measurement['tags']['hostname'] = str(hostname())
+#     measurement['fields'] = {}
+#     measurement['fields']['value'] = str(cpuTemp().decode('utf-8'))
+#     client.switch_database(db)
+#     client.write_points([measurement])
 
 def main():
-  Edgerouter.login(edgerouter_host, edgerouter_usr, edgerouter_pwd)
-  export_influxdb(influx_host, influx_usr, influx_pwd, influx_db)
-#endDef
+#   try:
+    er = Edgerouter(er_host, er_usr, er_pwd)
+    print(er.GetHostname())
+#   finally:
+#     exportInflux(db_host, db_database, db_usr, db_pwd)
 
 if __name__ == "__main__":
-  print("Starting Edgerouter Temp2Influx...")
   main()
-  schedule.every(1).minutes.do(main)
-  while 1:
-    schedule.run_pending()
-    time.sleep(1)
+#EOF
